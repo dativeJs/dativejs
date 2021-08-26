@@ -24,7 +24,7 @@ function stringToHTML(str) {
     });
   }
 
-  return doc.firstChild.lastChild.innerHTML
+  return doc.firstChild.lastChild
 }
 /**
  * Create settings and getters for data Proxy
@@ -60,13 +60,13 @@ function makeProxy(options, instance) {
 function trueTypeOf(obj) {
 		return Object.prototype.toString.call(obj).slice(8, -1).toLowerCase();
 	}
-let debug = false;
-function setDebug (on) {
-		debug = on ? true : false;
-}
+var config = ({
+  slient: true,
+  mode: 'Production'
+})
 function warn() {
-  if(debug){
-    console.error('[DativeJs Warn]: ', arguments[0])
+  if(!config.slient){
+    console.error('[dative Warn]: ', arguments[0])
   }
 }
 function tip(){
@@ -147,42 +147,30 @@ function removeClass(el, cls) {
     cur ? el.setAttribute('class', cur) : el.removeAttribute('class');
   }
 }
-var textInterpole = /\"((?:.|\n)+?)\"/g;
-var textInterpole_ = /\'((?:.|\n)+?)\'/g;
 function parsetext(text,opts,store) {
  return text.replace(/\{\{((?:.|\n)+?)\}\}/g, function(match) {
    var text$ = match.slice(3, -3) || match.slice(2, -2);
-   if (textInterpole.test(text$)) {
-     return text$.replace(textInterpole,function(mt,val){
-       return val
-     })
-   }
-   if (textInterpole_.test(text$)) {
-     return text$.replace(textInterpole_, function(mt, val) {
-       return val
-     })
-   }
    var sub = text$.split('.');
    if (sub.length > 1) {
      var temp = opts || store;
      sub.forEach(function(item) {
        if (!temp[item]) {
-         return eval(item);
+         return '';
        }
        temp = temp[item];
      });
      return temp;
    }else{
      var self = opts;
-     if (!self[text$]) return eval(text$);
+     if (!self[text$]) return '';
      return self[text$]
    }
   })
 }
 var dif$$ = function(elem, template,data,store){
   if ((elem instanceof Node)) {
-  var temp = stringToHTML(template)
-  elem.innerHTML = parsetext(temp,data,store);
+  var temp = stringToHTML(template);
+  elem.innerHTML = parsetext(temp.innerHTML,data,store);
   }else{
     warn((typeof elem)+' not a Node');
   }
@@ -212,7 +200,6 @@ function Dative(options = {}) {
   if (!(this instanceof Dative)) warn('Dative Must be called as a constructor');
     var $this = this;
     $this.options = options;
-    //$this.elem = $this.options.target;
     var _data = makeProxy(options, $this)
     $this.template = $this.options.template;
     $this.created = $this.options.created;
@@ -220,6 +207,7 @@ function Dative(options = {}) {
     $this.update = $this.options.update;
     $this.methods = $this.options.methods;
     $this.store = $this.options.store;
+    $this.directives = $this.options.directives;
     $this.$ref = {};
     $this.debounce = null;
     $this.updated = false;
@@ -287,55 +275,98 @@ function once(fn) {
   }
 }
 /**
+ * @param {Element|String} el
+ * borrowed from Vuejs
+ */
+function query(el) {
+  if (typeof el === 'string') {
+    var selected = document.querySelector(el);
+    if (!selected) {
+        warn(
+        'Cannot find element: ' + el
+      );
+      return document.createElement('div')
+    }
+    return selected
+  } else {
+    return el
+  }
+}
+/**
+ * @param {Element} el element
+ * @param {Event} event eventname
+ * @param {Function} cb callback function
+ */
+Dative.prototype.$on = function(el, event, cb) {
+  el.addEventListener(event, cb);
+}
+/**
+ * @param {Element} el element
+ * @param {Event} event eventname
+ * @param {Function} cb callback function
+ */
+Dative.prototype.$off = function(el, event, cb) {
+  el.removeEventListener(event, cb)
+}
+function kebabToCamel(str, options = { prefix: '', ignorePrefix: '' }) {
+  const { prefix, ignorePrefix } = options;
+  let ignoredStr = str;
+  if (ignorePrefix !== undefined && ignorePrefix !== null && ignorePrefix !== '') {
+    ignoredStr = ignoredStr.replace(new RegExp(`^${ignorePrefix}-`), '');
+  }
+  const camelStr = ignoredStr
+    .split('-')
+    .filter((s) => s !== '')
+    .reduce((r, s) => r = r + `${s[0].toUpperCase()}${s.slice(1)}`);
+  if (prefix !== undefined && prefix !== null && prefix !== '') {
+    return `${prefix}${camelStr.replace(/^([a-z])/, (m, p) => p.toUpperCase())}`;
+  }
+  return camelStr;
+}
+/**
  * returns the template to the dom
 **/
 Dative.prototype.render = function(){
- if (!this.options.target && !this.options.el){ warn('You did not provide a target for DativeJs');}
- let template =  trueTypeOf(this.template) === 'function' ? this.template() : this.template || `${document.querySelector('script[type="text/dative"]').innerHTML}`;
+ var $app = this;
+ $app.kebabToCamel = kebabToCamel;
+ let template =  trueTypeOf(this.template) === 'function' ? this.template() : this.template || '';
  if (!this.options || !template) warn('You did not provide a template for this instance.'); 
     var target = this.options.target || this.options.el;
-    this.elem = trueTypeOf(target) === 'string' ? document.querySelector(`${target}`) : target;
-    if (target == document.body || target == 'body' || target == document.head || target == 'head') {
+    $app.elem = query(target);
+    if (target == document.head || target == 'head') {
       this.elem.style.display = 'none';
-      warn('Can\'t mount on <body> or <head>')
+      warn('Can\'t mount on <head>')
     }
     var elem = this.elem;
     dif$$(elem,template, this.data);
-    // @depreciated will be removed in version 2
-    Dative.emit(elem, 'render', this.data);
     if (this.update !== undefined && this.update !== null) {
       if(this.updated){
-        this.update({ data: this.data});
+        this.update({ data: this.data });
       }
     }
     for (const el of elem.querySelectorAll('*')) {
       for (const name of el.getAttributeNames()) {
-        if (name.startsWith('@')) {
-          const eventName = name.slice(1);
+        if (name.startsWith('dv-on:')) {
+          const eventName = name.slice(6);
           const handlerName = el.getAttribute(name);
-          el.addEventListener(eventName, (evt) => this.methods[handlerName].call(this, evt));
+          this.$on(el,eventName, (evt) => this.methods[handlerName].call(this, evt));
           el.removeAttribute(name)
-        } else if (name.startsWith('on:')) {
-          const eventName = name.slice(3);
-          const handlerName = el.getAttribute(name);
-          el.addEventListener(eventName, (evt) => this.methods[handlerName].call(this, evt));
-          el.removeAttribute(name)
-        }else if (name === 'ref') {
+        }else if (name === 'dv-ref') {
           const refName = el.getAttribute(name);
           this.$ref[refName] = el;
           el.removeAttribute(name)
-        }else if (name.startsWith('on')) {
+        }else if (name.startsWith('dv-on')) {
           const name$$ = el.getAttribute(name);
           const name$$$ = name$$.split(":");
           const eventName = name$$$[0];
           const handlerName = name$$$[1];
-          el.addEventListener(eventName, (evt) => this.methods[handlerName].call(this, evt));
+          this.$on(el,eventName, (evt) => this.methods[handlerName].call(this, evt));
           el.removeAttribute(name)
-        }else if (name === ':show') {
+        }else if (name === 'dv-show') {
           const show = el.getAttribute(name);
           el.style.display = attributeparser(this.data,show) ? `block` : `none`;
           el.removeAttribute(name)
-        }else if (name === ':text') {
+        }else if (name === 'dv-text') {
           const text = el.getAttribute(name)
           el.textContent = attributeparser(this.data,text) === undefined ? '' : attributeparser(this.data,text);
           el.removeAttribute(name)
@@ -359,7 +390,7 @@ Dative.prototype.render = function(){
             }
           });
           el.removeAttribute(name);
-        }else if (name === ':html') {
+        }else if (name === 'dv-html') {
           const html = el.getAttribute(name)
           el.innerHTML = attributeparser(this.data,html) === undefined ? '' : attributeparser(this.data,html);
           el.removeAttribute(name)
@@ -376,7 +407,7 @@ Dative.prototype.render = function(){
             }
           })
           el.removeAttribute(name)
-        }else if (name.startsWith('bind:')) {
+        }else if (name.startsWith('dv-bind:')) {
           const propName = name.slice(5);
           const dataName = el.getAttribute(name);
           if (propName === 'html') {
@@ -412,14 +443,14 @@ Dative.prototype.render = function(){
             })
             el.removeAttribute(name)
           }
-          el[propName] = attributeparser(this.data,dataName);
+          el[this.kebabToCamel(propName)] = attributeparser(this.data,dataName);
           el.removeAttribute(name)
         }else if (name.startsWith(':')) {
           const propName$ = name.slice(1);
           const dataName$ = el.getAttribute(name);
-          el[propName$] = attributeparser(this.data, dataName$);
+          el[this.kebabToCamel(propName$)] = attributeparser(this.data, dataName$);
           el.removeAttribute(name)
-        }else if(name === 'if'){
+        }else if(name === 'dv-if'){
           const ifstatement = el.getAttribute(name);
           var iff = document.createComment('if');
           if (attributeparser(this.data,ifstatement)) {
@@ -431,70 +462,33 @@ Dative.prototype.render = function(){
             el.removeAttribute(name)
           }
         }
+        for (var keys in this.directives) {
+          var val = this.directives[keys];
+          if (typeof val === 'function') {
+            var $name = keys;
+            if (name.startsWith('dv-' + $name)) {
+              var binding = el.getAttribute(name);
+              val(el, { bind: { value: binding, args: name.split(':')[1] }, name: name })
+              el.removeAttribute(name)
+            }
+          }
+        }
       }
     }
-/**
- * Two way Binding for Dative
-**/
-const inputElements = document.querySelectorAll('[model]');
-const boundElements = document.querySelectorAll('[bind]');
-let scope = {};
-  for (let el of inputElements) {
-    if (el.tagName.toLowerCase() !== 'input') {
-      tip('<'+el.tagName.toLowerCase()+'>'+'</'+el.tagName.toLowerCase()+'>\n can\'t be used with this directive. \n '+'<'+el.tagName.toLowerCase()+'>')
-    }else{
-      if (el.type === 'text' || el.type === 'number' || el.type === 'password') {
-      let propName = el.getAttribute('model');
-      el.addEventListener('keyup', e => {
-        scope[propName] = el.value;
-      });
-      setPropUpdateLogic(propName);
-    }
-  }
-  }
-function setPropUpdateLogic(prop) {
-  if (!scope.hasOwnProperty(prop)) {
-    let value;
-    Object.defineProperty(scope, prop, {
-      set: (newValue) => {
-        value = newValue;
-        for (let el of inputElements) {
-          if (el.getAttribute('model') === prop) {
-            if (el.type) {
-              el.value = newValue;
-            }
-          }
-        }
-        for (let el of boundElements) {
-          if (el.getAttribute('bind') === prop) {
-            if (!el.type) {
-              el.innerHTML = newValue;
-            }
-          }
-        }
-      },
-      get: () => {
-        return value;
-      },
-      enumerable: true
-    })
-  }
 }
-}
-Dative.debug = setDebug;
-Dative.warn = warn;
+Dative.config = config;
 /**
  * @param {String} href css link
  * @example
  * Dative.importstyle('style')
 **/
-Dative.importstyle = function(href){
+Dative.importstyle = function(href,type=''){
   if (href === undefined || href === null) {
     warn('href needs a value to be a file');
   }
     var style = document.createElement('link');
     style.href = href + '.css';
-    style.type = 'text/css';
+    style.type = `text/${type ? type : 'css'}`;
     style.rel = 'stylesheet';
     document.head.appendChild(style);
 }
@@ -504,24 +498,11 @@ function checkType(element, type) {
 function NotType(element, type) {
   return typeof element !== type;
 }
-function kebabToCamel(str, options = { prefix: '', ignorePrefix: '' }){
-      const { prefix, ignorePrefix } = options;
-      let ignoredStr = str;
-      if (ignorePrefix !== undefined && ignorePrefix !== null && ignorePrefix !== '') {
-      ignoredStr = ignoredStr.replace(new RegExp(`^${ignorePrefix}-`), '');
-      }
-      const camelStr = ignoredStr
-      .split('-')
-      .filter((s) => s !== '')
-      .reduce((r, s) => r = r + `${s[0].toUpperCase()}${s.slice(1)}`);
-      if (prefix !== undefined && prefix !== null && prefix !== '') {
-      return `${prefix}${camelStr.replace(/^([a-z])/, (m, p) => p.toUpperCase())}`;
-      }
-      return camelStr;
-  }
 let activeEffect = null;
   class Dep {
-      subscribers = new Set()
+      constructor() {
+        this.subscribers = new Set()
+      }
       depend() {
           if (activeEffect) this.subscribers.add(activeEffect)
       }
@@ -563,36 +544,18 @@ const ref = (initialValue) => {
 /**
  * Dative Version
  **/    
-Dative.version = 'V1.0.0';  
+Dative.version = 'V2.0.0';  
 Dative.reactive = reactive;
 Dative.watchEffect = watchEffect;
 Dative.ref = ref;
-/**
- * Emit a custom event
- * @param  {Node} elem The element to emit the custom event on
- * @param  {String}  name The name of the custom event
- * @param  {*} detail Details to attach to the event
- * @param  {Boolean} noCancel If false, event cannot be cancelled
-**/
-function $$emit(elem, name, detail, noCancel=true) {
-  let event;
-  if (!elem || !name) return warn('You did not provide an element or event name.');
-  event = new CustomEvent(name, {
-    bubbles: true,
-    cancelable: !noCancel,
-    detail: detail
-  });
-  return elem.dispatchEvent(event);
-}
-Dative.emit = $$emit;
 /**
  * Install Dative plugin
  * @param  {Constructor} plugin The Dative plugin
  */
 Dative.use = function (plugin) {
 	var args = arguments[1];
-  var installedPlugins = [];
-  if (installedPlugins.hasOwnProperty(plugin)) {
+  var installedPlugins = new Set();
+  if (installedPlugins.has(plugin)) {
       warn(`${plugin} is already installed`);
     return this
   }
@@ -603,7 +566,7 @@ Dative.use = function (plugin) {
 	 if (typeof plugin === 'function') {
 		  plugin(Dative,args);
 		}
-	installedPlugins.push(plugin);
+	installedPlugins.add(plugin);
 };
 return Dative;
 }());

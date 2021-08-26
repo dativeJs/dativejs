@@ -567,5 +567,5 @@ Dative.use = function (plugin) {
 		}
 	installedPlugins.add(plugin);
 };
-export default Dative;
-export { watchEffect,reactive, ref }
+module.exports = Dative;
+module.exports = { watchEffect,reactive, ref }
