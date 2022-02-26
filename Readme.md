@@ -26,9 +26,7 @@ DativeJs is a modern javascript framework for building interactive user interfac
       msg: "World"
     },
     template: "#template"
-
-
   });
-
+  app.render();
 </script>
 ```
