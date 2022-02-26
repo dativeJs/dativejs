@@ -4,15 +4,15 @@ DativeJs is a javascript frameeork for building interactive user interface.
 # [Installation](#)
 ```html
 <!--development-->
-<script src="https://cdn.jsdelivr.net/gh/dativeJs/dativejs@main/dist/dative.js"></script>
+<script src="https://cdn.jsdelivr.net/gh/dativeJs/dativejs@v1/dist/dative.js"></script>
 <!--production-->
-<script src="https://cdn.jsdelivr.net/gh/dativeJs/dativejs@main/dist/dative.min.js"></script>
+<script src="https://cdn.jsdelivr.net/gh/dativeJs/dativejs@v1/dist/dative.min.js"></script>
 
 ```
 ## [Usage](#)
 ```html
 <div id="app"></div>
-<script src="https://cdn.jsdelivr.net/gh/dativeJs/dativejs@main/dist/dative.min.js"></script>
+<script src="https://cdn.jsdelivr.net/gh/dativeJs/dativejs@v1/dist/dative.min.js"></script>
 <script>
   var app = new Dative({
     el: "#app",
