@@ -1,0 +1,62 @@
+{
+  "name": "dativejs",
+  "version": "2.0.0-alpha.0",
+  "description": "A mordern Ui Javascript Framework",
+  "main": "index.js",
+  "module": "dist/dative.esm.js",
+  "types": "types/index.d.ts",
+  "unpkg": "dist/dative.min.js",
+  "jsdelivr": "dist/dative.min.js",
+  "files": [
+    "index.js",
+    "index.mjs",
+    "dist",
+    "src",
+    "types",
+    "animation",
+    "rollup.config.js", 
+    "Readme.markdown"
+  ],
+  "scripts": {
+    "build": "rollup -c"
+  },
+  "exports": {
+    ".": {
+      "import": {
+        "node": "./index.mjs",
+        "default": "./dist/dative.esm.js"
+      },
+      "require": "./index.js"
+    },
+    "./package.json": "./package.json",
+    "./animation": {
+      "import": "./animation/index.mjs",
+      "require": "./animation/index.js"
+    }
+  },
+  "buildOptions": {
+    "name": "Dativejs",
+    "formats": [
+      "esm-bundler",
+      "cjs",
+      "iife"
+    ]
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/dativeJs/dativejs.git"
+  },
+  "keywords": [
+    "Reactive",
+    "Reactivity",
+    "Framework",
+    "Javascript",
+    "Dativejs"
+  ],
+  "author": "Tobithedev <ucheemekatobi@gmail.com>",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/dativeJs/dativejs/issues"
+  },
+  "homepage": "https://dativejs.js.org"
+}
